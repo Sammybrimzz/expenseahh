@@ -51,6 +51,9 @@
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -87,6 +90,9 @@
   --chart-3: oklch(0.398 0.07 227.392);
   --chart-4: oklch(0.828 0.189 84.429);
   --chart-5: oklch(0.769 0.188 70.08);
+  --success: oklch(0.5 0.14 155);
+  --warning: oklch(0.68 0.15 75);
+  --danger: oklch(0.56 0.2 27);
   --sidebar: oklch(0.984 0.003 247.858);
   --sidebar-foreground: oklch(0.129 0.042 264.695);
   --sidebar-primary: oklch(0.208 0.042 265.755);
@@ -122,6 +128,9 @@
   --chart-3: oklch(0.769 0.188 70.08);
   --chart-4: oklch(0.627 0.265 303.9);
   --chart-5: oklch(0.645 0.246 16.439);
+  --success: oklch(0.72 0.16 155);
+  --warning: oklch(0.8 0.15 75);
+  --danger: oklch(0.7 0.19 27);
   --sidebar: oklch(0.208 0.042 265.755);
   --sidebar-foreground: oklch(0.984 0.003 247.858);
   --sidebar-primary: oklch(0.488 0.243 264.376);
@@ -140,5 +149,122 @@
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
+    font-family: ui-sans-serif, system-ui, sans-serif;
+    letter-spacing: 0;
   }
+
+  button, input, select {
+    min-width: 0;
+  }
+
+  button:not(:disabled) {
+    cursor: pointer;
+  }
+}
+
+@layer components {
+  .field {
+    width: 100%;
+    min-height: 2.75rem;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-input);
+    background: var(--color-background);
+    padding: 0.625rem 0.75rem;
+    color: var(--color-foreground);
+    outline: none;
+    transition: border-color 150ms ease, box-shadow 150ms ease;
+  }
+
+  .field:focus {
+    border-color: var(--color-ring);
+    box-shadow: 0 0 0 3px color-mix(in oklch, var(--color-ring) 22%, transparent);
+  }
+
+  .label {
+    display: block;
+    font-size: 0.8125rem;
+    font-weight: 650;
+    color: var(--color-foreground);
+  }
+
+  .button-primary, .button-secondary, .button-danger, .select-button {
+    display: inline-flex;
+    min-height: 2.75rem;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: var(--radius-md);
+    padding: 0.625rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 700;
+    transition: transform 100ms ease, background-color 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
+  }
+
+  .button-primary {
+    border: 1px solid var(--color-primary);
+    background: var(--color-primary);
+    color: var(--color-primary-foreground);
+    box-shadow: 0 2px 0 color-mix(in oklch, var(--color-primary) 55%, black);
+  }
+
+  .button-secondary {
+    border: 1px solid var(--color-border);
+    background: var(--color-card);
+    color: var(--color-card-foreground);
+    box-shadow: 0 2px 0 var(--color-border);
+  }
+
+  .button-danger {
+    border: 1px solid var(--color-danger);
+    background: color-mix(in oklch, var(--color-danger) 10%, var(--color-card));
+    color: var(--color-danger);
+  }
+
+  .button-primary:active, .button-secondary:active, .button-danger:active, .select-button:active, .icon-button:active {
+    transform: translateY(2px) scale(0.98);
+    box-shadow: none;
+  }
+
+  .select-button {
+    border: 1px solid var(--color-border);
+    background: var(--color-background);
+    color: var(--color-muted-foreground);
+  }
+
+  .select-button.selected {
+    border-color: var(--color-primary);
+    background: var(--color-primary);
+    color: var(--color-primary-foreground);
+    box-shadow: 0 0 0 2px color-mix(in oklch, var(--color-primary) 18%, transparent);
+  }
+
+  .icon-button {
+    display: inline-grid;
+    width: 2.5rem;
+    height: 2.5rem;
+    place-items: center;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-border);
+    background: var(--color-card);
+    color: var(--color-foreground);
+    transition: transform 100ms ease, background-color 150ms ease;
+  }
+
+  .pill {
+    border-radius: 999px;
+    background: var(--color-muted);
+    padding: 0.4rem 0.7rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+}
+
+@media (hover: hover) {
+  .button-primary:hover { background: color-mix(in oklch, var(--color-primary) 90%, var(--color-background)); }
+  .button-secondary:hover, .icon-button:hover { background: var(--color-muted); }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .rise { animation: rise-in 300ms ease-out both; }
+  @keyframes rise-in { from { opacity: 0; transform: translateY(6px); } }
 }
