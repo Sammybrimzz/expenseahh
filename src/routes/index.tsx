@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState, type FormEvent } from "react";
 import { ArrowDownLeft, ArrowRightLeft, BarChart3, CalendarDays, Check, ChevronDown, CircleHelp, Download, FileText, LayoutDashboard, Menu, Pencil, Plus, Search, Settings2, SlidersHorizontal, Trash2, Wallet, X } from "lucide-react";
 import { toast } from "sonner";
-import { LedgerProvider, dateLabel, exportLedgerCSV, formatINR, formatShortINR, getSummary, getTodayISO, monthFromDate, monthLabel, useLedger, type PaymentMethod, type Transaction, type TransactionType } from "../lib/ledger";
+import { LedgerProvider, dateLabel, exportLedgerCSV, exportLedgerPDF, formatINR, formatShortINR, getSummary, getTodayISO, monthFromDate, monthLabel, useLedger, type PaymentMethod, type Transaction, type TransactionType } from "../lib/ledger";
 
 export const Route = createFileRoute("/")({
   head: () => ({ meta: [
@@ -24,11 +24,13 @@ function LedgerExperience() {
   const { isReady, store, activeLedger, createMonth } = useLedger();
   const [section, setSection] = useState("Dashboard");
   const [showSetup, setShowSetup] = useState(false);
+  const [showExpense, setShowExpense] = useState(false);
+  const [showDownloads, setShowDownloads] = useState(false);
   if (!isReady) return <div className="min-h-screen grid place-items-center text-muted font-mono text-sm">Opening your ledger…</div>;
   if (!store || !activeLedger) return <SetupScreen onCreate={(month, cash, budget, bank) => { createMonth(month, cash, budget, bank); setShowSetup(false); }} />;
-  return <div className="min-h-screen bg-background text-foreground"><Header section={section} setSection={setSection} onNewMonth={() => setShowSetup(true)} />
+  return <div className="min-h-screen bg-background text-foreground"><Header section={section} setSection={setSection} onNewMonth={() => setShowSetup(true)} onAddExpense={() => setShowExpense(true)} />
     <main className="mx-auto max-w-6xl px-5 md:px-8 py-7 space-y-7 pb-28 md:pb-10">
-      {section === "Dashboard" && <Dashboard setSection={setSection} />}
+       {section === "Dashboard" && <Dashboard setSection={setSection} onDownload={() => setShowDownloads(true)} />}
       {section === "Expenses" && <ExpensesPage />}
       {section === "Cash" && <CashPage />}
       {section === "Reports" && <ReportsPage />}
@@ -37,38 +39,36 @@ function LedgerExperience() {
     </main>
     <MobileNav section={section} setSection={setSection} />
     {showSetup && <MonthDialog onClose={() => setShowSetup(false)} />}
+     {showExpense && <ExpenseDialog onClose={() => setShowExpense(false)} />}
+     {showDownloads && <DownloadMonthlyDialog onClose={() => setShowDownloads(false)} />}
   </div>;
 }
 
 const navItems = [{ label: "Dashboard", icon: LayoutDashboard }, { label: "Expenses", icon: FileText }, { label: "Cash", icon: Wallet }, { label: "Reports", icon: BarChart3 }, { label: "Budgets", icon: SlidersHorizontal }, { label: "Settings", icon: Settings2 }];
 
-function Header({ section, setSection, onNewMonth }: { section: string; setSection: (value: string) => void; onNewMonth: () => void }) {
-  const { activeLedger, store } = useLedger();
+function Header({ section, setSection, onNewMonth, onAddExpense }: { section: string; setSection: (value: string) => void; onNewMonth: () => void; onAddExpense: () => void }) {
+  const { activeLedger, store, setActiveMonth } = useLedger();
   const [monthOpen, setMonthOpen] = useState(false);
-  const [showExpense, setShowExpense] = useState(false);
   return <header className="sticky top-0 z-30 bg-background/90 backdrop-blur border-b border-border"><div className="mx-auto max-w-6xl px-5 md:px-8 h-16 flex items-center justify-between gap-4">
     <button onClick={() => setSection("Dashboard")} className="flex items-center gap-2.5 min-w-0 text-left"><span className="size-8 grid place-items-center rounded-full bg-primary text-primary-foreground font-display font-semibold text-sm">H</span><span className="leading-none"><span className="block font-display font-semibold text-[17px] tracking-tight">Hatch</span><span className="block text-[11px] text-muted-foreground font-mono mt-1">Pocket ledger</span></span></button>
     <nav className="hidden md:flex items-center gap-1 text-sm">{navItems.map(({ label }) => <button key={label} onClick={() => setSection(label)} className={`px-3 py-2 rounded-full transition-colors ${section === label ? "bg-foreground text-background font-medium" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}>{label}</button>)}</nav>
-    <div className="flex items-center gap-2.5 relative"><button onClick={() => setMonthOpen((open) => !open)} className="hidden sm:flex items-center gap-2 pl-3 pr-2 py-1.5 rounded-full border border-border bg-card text-sm font-medium"><span className="size-1.5 rounded-full bg-success"></span>{monthLabel(activeLedger?.month || "2026-08")}<ChevronDown size={14} /></button><button onClick={() => setShowExpense(true)} className="group inline-flex items-center gap-1.5 pl-1.5 pr-3.5 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold shadow-sm hover:bg-primary/90"><span className="grid place-items-center size-6 rounded-full bg-primary-foreground/20 font-display text-base leading-none"><Plus size={16} /></span><span className="hidden sm:inline">Add Expense</span><span className="sm:hidden">Add</span></button>
-      {monthOpen && <div className="absolute right-0 top-12 z-40 w-56 bg-popover border border-border rounded-xl shadow-elevated p-2"><p className="px-3 py-2 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Your ledgers</p>{store?.ledgers.map((ledger) => <button key={ledger.id} onClick={() => { useLedger().setActiveMonth(ledger.id); setMonthOpen(false); }} className="w-full text-left px-3 py-2 rounded-lg hover:bg-muted text-sm">{monthLabel(ledger.month)}</button>)}<button onClick={onNewMonth} className="w-full text-left px-3 py-2 mt-1 border-t border-border text-sm font-medium text-primary">+ Start a new month</button></div>}
+     <div className="flex items-center gap-2.5 relative"><button onClick={() => setMonthOpen((open) => !open)} className="hidden sm:flex items-center gap-2 pl-3 pr-2 py-1.5 rounded-full border border-border bg-card text-sm font-medium"><span className="size-1.5 rounded-full bg-success"></span>{monthLabel(activeLedger?.month || "2026-08")}<ChevronDown size={14} /></button><button onClick={onAddExpense} className="button-primary group rounded-full py-2 pl-1.5 pr-3.5"><span className="grid place-items-center size-6 rounded-full bg-primary-foreground/20 font-display text-base leading-none"><Plus size={16} /></span><span className="hidden sm:inline">Add Expense</span><span className="sm:hidden">Add</span></button>
+       {monthOpen && <div className="absolute right-0 top-12 z-40 w-56 bg-popover border border-border rounded-xl shadow-elevated p-2"><p className="px-3 py-2 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Your ledgers</p>{store?.ledgers.map((ledger) => <button key={ledger.id} onClick={() => { setActiveMonth(ledger.id); setMonthOpen(false); }} className="w-full text-left px-3 py-2 rounded-lg hover:bg-muted text-sm">{monthLabel(ledger.month)}</button>)}<button onClick={onNewMonth} className="w-full text-left px-3 py-2 mt-1 border-t border-border text-sm font-medium text-primary">+ Start a new month</button></div>}
     </div>
-    {showExpense && <ExpenseDialog onClose={() => setShowExpense(false)} />}
   </div></header>;
 }
 
-function Dashboard({ setSection }: { setSection: (value: string) => void }) {
+function Dashboard({ setSection, onDownload }: { setSection: (value: string) => void; onDownload: () => void }) {
   const { activeLedger } = useLedger();
   const summary = getSummary(activeLedger!);
-  const [showExpense, setShowExpense] = useState(false);
   return <>
-    <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-5"><div className="rise"><p className="font-mono text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Month {activeLedger?.month.slice(5)} · Day {summary.elapsed} of {new Date(Number(activeLedger?.month.slice(0, 4)), Number(activeLedger?.month.slice(5)) || 1, 0).getDate()}</p><h1 className="font-display italic font-semibold text-3xl md:text-[40px] leading-tight tracking-tight mt-2">This month's ledger</h1><p className="text-muted-foreground text-sm mt-1.5 max-w-[42ch]">A calm place to keep tabs on the rupee — cash and UPI, side by side.</p></div><QuickAdd />
+     <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-5"><div className="rise"><p className="font-mono text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Month {activeLedger?.month.slice(5)} · Day {summary.elapsed} of {new Date(Number(activeLedger?.month.slice(0, 4)), Number(activeLedger?.month.slice(5)) || 1, 0).getDate()}</p><h1 className="font-display italic font-semibold text-3xl md:text-[40px] leading-tight tracking-tight mt-2">This month's ledger</h1><p className="text-muted-foreground text-sm mt-1.5 max-w-[42ch]">A calm place to keep tabs on the rupee — cash and UPI, side by side.</p></div><div className="flex w-full flex-col gap-2 lg:w-auto sm:flex-row sm:items-center"><QuickAdd /><button onClick={onDownload} className="button-secondary w-full justify-center sm:w-auto"><Download size={16} /> Download monthly expenses</button></div>
     </div>
     <section className="grid grid-cols-2 md:grid-cols-5 gap-3 md:gap-4"><Metric label="Total spent" value={formatShortINR(summary.totalSpent)} note={`${summary.expenses.length} expense${summary.expenses.length === 1 ? "" : "s"}`} /><Metric label="Today" value={formatShortINR(summary.expenses.filter((item) => item.date === getTodayISO()).reduce((sum, item) => sum + item.amount, 0))} note={dateLabel(getTodayISO(), "short")} /><Metric label="Cash spent" value={formatShortINR(summary.cashSpent)} note="Physical cash out" /><Metric label="Cash remaining" value={formatShortINR(summary.cashRemaining)} note={`of ${formatShortINR(activeLedger?.startingCash || 0)} starting`} dark={summary.cashRemaining >= 0} /><Metric label="Daily average" value={formatShortINR(summary.dailyAverage)} note={`Projected ${formatShortINR(summary.projected)}`} /></section>
     {activeLedger?.monthlyBudget ? <BudgetStrip budget={activeLedger.monthlyBudget} spent={summary.totalSpent} /> : null}
     <section className="grid grid-cols-1 lg:grid-cols-5 gap-4"><CashWallet /><CategoryBreakdown /></section>
     {summary.cashRemaining < 0 && <div className="border border-danger/30 bg-danger/10 text-danger rounded-xl p-4 text-sm flex items-center gap-3"><CircleHelp size={18} /><span><strong>Cash balance is negative.</strong> Check for a missing cash addition or an incorrectly recorded cash expense.</span></div>}
     <section className="grid grid-cols-1 lg:grid-cols-5 gap-4"><RecentExpenses onViewAll={() => setSection("Expenses")} /><Insights /></section>
-    {showExpense && <ExpenseDialog onClose={() => setShowExpense(false)} />}
   </>;
 }
 
