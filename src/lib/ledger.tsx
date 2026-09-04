@@ -66,8 +66,8 @@ export function emptyLedger(month: string, startingCash: number, monthlyBudget?:
     id: crypto.randomUUID(),
     month,
     startingCash,
-    startingBank,
-    monthlyBudget,
+    ...(startingBank === undefined ? {} : { startingBank }),
+    ...(monthlyBudget === undefined ? {} : { monthlyBudget }),
     categoryBudgets: {},
     categories: [...DEFAULT_CATEGORIES],
     transactions: [],
@@ -220,9 +220,120 @@ export function exportLedgerJSON(store: LedgerStore) {
 }
 
 export function exportLedgerCSV(ledger: Ledger) {
-  const rows = [["Date", "Amount", "Category", "Payment method", "Type", "Note"], ...ledger.transactions.map((item) => [item.date, String(item.amount), item.category, item.paymentMethod === "cash" ? "Cash" : item.paymentMethod === "upi" ? "UPI / Bank" : "", item.type, item.note])];
+  const summary = getSummary(ledger);
+  const expenses = summary.expenses.slice().sort((a, b) => a.date.localeCompare(b.date));
+  const categoryRows = summary.categories.map((item) => [item.category, formatINR(item.amount)]);
+  const rows = [
+    ["Date", "Expense description", "Category", "Amount", "Payment method", "Notes"],
+    ...expenses.map((item) => [
+      item.date,
+      item.note || item.category,
+      item.category,
+      formatINR(item.amount),
+      item.paymentMethod === "cash" ? "Cash" : item.paymentMethod === "upi" ? "UPI / Bank" : "Not specified",
+      item.note,
+    ]),
+    [],
+    ["MONTHLY TOTALS"],
+    ["Total monthly expenses", formatINR(summary.totalSpent)],
+    ["Total cash expenses", formatINR(summary.cashSpent)],
+    ["Total digital / bank expenses", formatINR(summary.upiSpent)],
+    [],
+    ["CATEGORY-WISE TOTALS"],
+    ...categoryRows,
+  ];
   const csv = rows.map((row) => row.map((cell) => `"${cell.replaceAll('"', '""')}"`).join(",")).join("\n");
   downloadBlob(new Blob([csv], { type: "text/csv;charset=utf-8" }), `${ledger.month}-ledger.csv`);
+}
+
+export async function exportLedgerPDF(ledger: Ledger) {
+  const { jsPDF } = await import("jspdf");
+  const summary = getSummary(ledger);
+  const expenses = summary.expenses.slice().sort((a, b) => a.date.localeCompare(b.date));
+  const doc = new jsPDF({ unit: "mm", format: "a4" });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const margin = 16;
+  let y = 18;
+  const money = (value: number) => `INR ${new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 }).format(value || 0)}`;
+  const ensureSpace = (height: number) => {
+    if (y + height <= pageHeight - margin) return;
+    doc.addPage();
+    y = margin;
+  };
+  const drawLine = () => {
+    doc.setDrawColor(220, 220, 220);
+    doc.line(margin, y, pageWidth - margin, y);
+  };
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(20);
+  doc.text(`${monthLabel(ledger.month)} Expense Report`, margin, y);
+  y += 8;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.setTextColor(100, 100, 100);
+  doc.text("Monthly expense summary", margin, y);
+  y += 8;
+  drawLine();
+  y += 8;
+
+  doc.setTextColor(30, 30, 30);
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "bold");
+  doc.text("Date", margin, y);
+  doc.text("Description", margin + 25, y);
+  doc.text("Category", margin + 91, y);
+  doc.text("Payment", margin + 128, y);
+  doc.text("Amount", pageWidth - margin, y, { align: "right" });
+  y += 5;
+  drawLine();
+  y += 6;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  expenses.forEach((item) => {
+    ensureSpace(9);
+    const description = (item.note || item.category).slice(0, 30);
+    const payment = item.paymentMethod === "cash" ? "Cash" : item.paymentMethod === "upi" ? "UPI / Bank" : "—";
+    doc.text(dateLabel(item.date, "short"), margin, y);
+    doc.text(description, margin + 25, y);
+    doc.text(item.category.slice(0, 18), margin + 91, y);
+    doc.text(payment, margin + 128, y);
+    doc.text(money(item.amount), pageWidth - margin, y, { align: "right" });
+    y += 6;
+  });
+
+  ensureSpace(50);
+  y += 4;
+  drawLine();
+  y += 8;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(12);
+  doc.text("Monthly totals", margin, y);
+  y += 7;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  [
+    ["Total monthly expenses", summary.totalSpent],
+    ["Total cash expenses", summary.cashSpent],
+    ["Total digital / bank expenses", summary.upiSpent],
+  ].forEach(([label, value]) => {
+    doc.text(String(label), margin, y);
+    doc.text(money(Number(value)), pageWidth - margin, y, { align: "right" });
+    y += 6;
+  });
+  y += 4;
+  doc.setFont("helvetica", "bold");
+  doc.text("Category-wise totals", margin, y);
+  y += 7;
+  doc.setFont("helvetica", "normal");
+  summary.categories.forEach((item) => {
+    ensureSpace(7);
+    doc.text(item.category, margin, y);
+    doc.text(money(item.amount), pageWidth - margin, y, { align: "right" });
+    y += 6;
+  });
+  doc.save(`${ledger.month}-expense-report.pdf`);
 }
 
 function downloadBlob(blob: Blob, filename: string) {
