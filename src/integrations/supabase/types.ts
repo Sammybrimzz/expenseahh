@@ -14,7 +14,24 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      user_ledgers: {
+        Row: {
+          ledger_data: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          ledger_data?: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          ledger_data?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
