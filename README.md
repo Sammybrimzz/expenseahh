@@ -50,8 +50,8 @@ I also used AI-assisted development tools to help turn the idea into a working w
 Make sure you have Node.js and npm installed.
 
 ```bash
-git clone <your-repository-url>
-cd <repository-name>
+git clone <https://github.com/Sammybrimzz/expenseahh>
+cd <expenseahh>
 npm install
 npm run dev
 ```
